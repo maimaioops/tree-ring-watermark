@@ -26,10 +26,12 @@ def main(args):
     
     scheduler = DPMSolverMultistepScheduler.from_pretrained(args.model_id, subfolder='scheduler')
     pipe = InversableStableDiffusionPipeline.from_pretrained(
+        #"/data3/cxy/models/stable-diffusion-v1-4-diffusers",
         args.model_id,
+        revision="main",  # 新增：指定模型主分支，解决fp16版本错误
         scheduler=scheduler,
         torch_dtype=torch.float16,
-        revision='fp16',
+        #revision='fp16',
         )
     pipe = pipe.to(device)
 
