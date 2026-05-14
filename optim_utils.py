@@ -3,6 +3,7 @@ from torchvision import transforms
 from datasets import load_dataset
 
 from PIL import Image, ImageFilter
+from io import BytesIO
 import random
 import numpy as np
 import copy
@@ -51,10 +52,15 @@ def image_distortion(img1, img2, seed, args):
         img2 = transforms.RandomRotation((args.r_degree, args.r_degree))(img2)
 
     if args.jpeg_ratio is not None:
-        img1.save(f"tmp_{args.jpeg_ratio}_{args.run_name}.jpg", quality=args.jpeg_ratio)
-        img1 = Image.open(f"tmp_{args.jpeg_ratio}_{args.run_name}.jpg")
-        img2.save(f"tmp_{args.jpeg_ratio}_{args.run_name}.jpg", quality=args.jpeg_ratio)
-        img2 = Image.open(f"tmp_{args.jpeg_ratio}_{args.run_name}.jpg")
+        buf1 = BytesIO()
+        img1.save(buf1, format='JPEG', quality=args.jpeg_ratio)
+        buf1.seek(0)
+        img1 = Image.open(buf1).copy()
+
+        buf2 = BytesIO()
+        img2.save(buf2, format='JPEG', quality=args.jpeg_ratio)
+        buf2.seek(0)
+        img2 = Image.open(buf2).copy()
 
     if args.crop_scale is not None and args.crop_ratio is not None:
         set_random_seed(seed)

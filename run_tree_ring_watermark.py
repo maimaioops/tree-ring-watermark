@@ -54,6 +54,7 @@ def main(args):
     clip_scores_w = []
     no_w_metrics = []
     w_metrics = []
+    skipped = 0
 
     for i in tqdm(range(args.start, args.end)):
         seed = i + args.gen_seed
@@ -100,30 +101,35 @@ def main(args):
         orig_image_w = outputs_w.images[0]
 
         ### test watermark
-        # distortion
-        orig_image_no_w_auged, orig_image_w_auged = image_distortion(orig_image_no_w, orig_image_w, seed, args)
+        try:
+            # distortion
+            orig_image_no_w_auged, orig_image_w_auged = image_distortion(orig_image_no_w, orig_image_w, seed, args)
 
-        # reverse img without watermarking
-        img_no_w = transform_img(orig_image_no_w_auged).unsqueeze(0).to(text_embeddings.dtype).to(device)
-        image_latents_no_w = pipe.get_image_latents(img_no_w, sample=False)
+            # reverse img without watermarking
+            img_no_w = transform_img(orig_image_no_w_auged).unsqueeze(0).to(text_embeddings.dtype).to(device)
+            image_latents_no_w = pipe.get_image_latents(img_no_w, sample=False)
 
-        reversed_latents_no_w = pipe.forward_diffusion(
-            latents=image_latents_no_w,
-            text_embeddings=text_embeddings,
-            guidance_scale=1,
-            num_inference_steps=args.test_num_inference_steps,
-        )
+            reversed_latents_no_w = pipe.forward_diffusion(
+                latents=image_latents_no_w,
+                text_embeddings=text_embeddings,
+                guidance_scale=1,
+                num_inference_steps=args.test_num_inference_steps,
+            )
 
-        # reverse img with watermarking
-        img_w = transform_img(orig_image_w_auged).unsqueeze(0).to(text_embeddings.dtype).to(device)
-        image_latents_w = pipe.get_image_latents(img_w, sample=False)
+            # reverse img with watermarking
+            img_w = transform_img(orig_image_w_auged).unsqueeze(0).to(text_embeddings.dtype).to(device)
+            image_latents_w = pipe.get_image_latents(img_w, sample=False)
 
-        reversed_latents_w = pipe.forward_diffusion(
-            latents=image_latents_w,
-            text_embeddings=text_embeddings,
-            guidance_scale=1,
-            num_inference_steps=args.test_num_inference_steps,
-        )
+            reversed_latents_w = pipe.forward_diffusion(
+                latents=image_latents_w,
+                text_embeddings=text_embeddings,
+                guidance_scale=1,
+                num_inference_steps=args.test_num_inference_steps,
+            )
+        except (OSError, ValueError, RuntimeError) as e:
+            skipped += 1
+            print(f"[skip] sample {i} failed during image processing: {e}")
+            continue
 
         # eval
         no_w_metric, w_metric = eval_watermark(reversed_latents_no_w, reversed_latents_w, watermarking_mask, gt_patch, args)
@@ -157,6 +163,9 @@ def main(args):
     preds = no_w_metrics +  w_metrics
     t_labels = [0] * len(no_w_metrics) + [1] * len(w_metrics)
 
+    if len(no_w_metrics) == 0:
+        raise RuntimeError(f"No valid samples processed. skipped={skipped}")
+
     fpr, tpr, thresholds = metrics.roc_curve(t_labels, preds, pos_label=1)
     auc = metrics.auc(fpr, tpr)
     acc = np.max(1 - (fpr + (1 - tpr))/2)
@@ -177,6 +186,7 @@ def main(args):
     else:
         print('clip_score_mean: N/A (run without --with_tracking or reference model similarity logging)')
         print('w_clip_score_mean: N/A (run without --with_tracking or reference model similarity logging)')
+    print(f'skipped: {skipped}')
     print(f'auc: {auc}, acc: {acc}, TPR@1%FPR: {low}')
 
 
