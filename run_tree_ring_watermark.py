@@ -164,12 +164,19 @@ def main(args):
 
     if args.with_tracking:
         wandb.log({'Table': table})
-        wandb.log({'clip_score_mean': mean(clip_scores), 'clip_score_std': stdev(clip_scores),
-                   'w_clip_score_mean': mean(clip_scores_w), 'w_clip_score_std': stdev(clip_scores_w),
-                   'auc': auc, 'acc':acc, 'TPR@1%FPR': low})
+        if clip_scores:
+            wandb.log({'clip_score_mean': mean(clip_scores), 'clip_score_std': stdev(clip_scores) if len(clip_scores) > 1 else 0.0,
+                       'w_clip_score_mean': mean(clip_scores_w), 'w_clip_score_std': stdev(clip_scores_w) if len(clip_scores_w) > 1 else 0.0,
+                       'auc': auc, 'acc':acc, 'TPR@1%FPR': low})
+        else:
+            wandb.log({'auc': auc, 'acc':acc, 'TPR@1%FPR': low})
     
-    print(f'clip_score_mean: {mean(clip_scores)}')
-    print(f'w_clip_score_mean: {mean(clip_scores_w)}')
+    if clip_scores:
+        print(f'clip_score_mean: {mean(clip_scores)}')
+        print(f'w_clip_score_mean: {mean(clip_scores_w)}')
+    else:
+        print('clip_score_mean: N/A (run without --with_tracking or reference model similarity logging)')
+        print('w_clip_score_mean: N/A (run without --with_tracking or reference model similarity logging)')
     print(f'auc: {auc}, acc: {acc}, TPR@1%FPR: {low}')
 
 
